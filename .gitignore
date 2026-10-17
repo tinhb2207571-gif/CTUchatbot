@@ -173,3 +173,21 @@ __pycache__/
 # Local reference data (not required to start the application)
 /data.csv
 /data_table_monhoc.xlsx
+
+# Local reference diagrams, notes and one-off experiments
+/ARCHITECTURE_INTEGRATED.md
+/backend/notification_qa_30.md
+/backend/app/system_pipeline_flow.json
+/backend/app/services/*/domain_flow.json
+/backend/chatbot.png
+/connect_neo4j.py
+/run_thong_bao.py
+/test_model.py
+/frontend/app/Untitled-*.md
+/frontend/app/Untitled-*.txt
+/frontend/app/Thuật toán *.md
+
+# Database snapshots and local backups
+*.dump
+*.backup
+*.backup.*
