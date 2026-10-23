@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from hashlib import sha256
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -44,8 +45,23 @@ class NotificationIngestionTests(unittest.TestCase):
         self.assertEqual((result["nodes"], result["edges"]), (5, 4))
         write.assert_called_once_with(Path("notice_chunks.json"))
         self.stack[1].assert_called_once_with(
-            self.source.resolve(), self.source.parent / "processed" / "notice"
+            self.source.resolve(), self.source.parent / "processed" / sha256(str(self.source.resolve()).encode("utf-8")).hexdigest()[:16]
         )
+
+    def test_long_uploaded_filename_keeps_windows_output_path_short(self):
+        self.source = Path("D:/Project/CTUChatbot/uploads/ThongBao_KeHoach/TB_Xoa_Lop_HP_HK1_2026_2027_DOTCUOI.signed.signed.signed.signed_20261017_073142_0f82fa47.pdf")
+        with patch.object(importer, "doc_file_chunks", return_value={"tai_lieu": [{}]}), patch.object(
+            importer, "nhap_file_moi", return_value={
+                "id_thong_bao": "long-notice", "so_luong_nut": {"ThongBao": 1, "TaiLieu": 1},
+                "so_luong_embedding": {},
+            }
+        ):
+            ingestion.process_notification(str(self.source))
+        input_path, output_root = self.stack[1].call_args.args
+        self.assertEqual(input_path.name, self.source.name)
+        for stage in ingestion.pipeline.PIPELINE_STEPS:
+            output = output_root / stage.output_directory / (self.source.stem + "_metadata.json")
+            self.assertLess(len(str(output)), 260)
 
     def test_pipeline_failure_restores_paths_and_does_not_import(self):
         def fail(*args):

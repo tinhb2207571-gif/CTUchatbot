@@ -1,6 +1,7 @@
 """Nhập một PDF tải từ web bằng pipeline Thông báo hiện có."""
 
 from pathlib import Path
+from hashlib import sha256
 from threading import Lock
 
 from .preprocess.pdf_pipeline import pipeline
@@ -15,7 +16,10 @@ def process_notification(file_path: str) -> dict:
     from .preprocess.kg_importer.nhap_file_moi import doc_file_chunks, nhap_file_moi
 
     source = Path(file_path).resolve()
-    output_root = source.parent / "processed" / source.stem
+    # Không lặp tên PDF dài trong cả thư mục và tên JSON (MAX_PATH Windows).
+    # Giữ nguyên tên PDF để metadata và ID tài liệu không đổi.
+    output_id = sha256(str(source).encode("utf-8")).hexdigest()[:16]
+    output_root = source.parent / "processed" / output_id
     with _pipeline_lock:
         modules = [pipeline.load_step(step) for step in pipeline.PIPELINE_STEPS]
         original_outputs = [module.OUTPUT_DIR for module in modules]

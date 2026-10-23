@@ -56,11 +56,8 @@ class ChatOrchestrator:
             log_event("CHAT", "done", domain="SOCIAL", total_ms=elapsed_ms(total_started))
             return {"answer": answer, "domain": "SOCIAL", "debug": {"reason": "empty_query"}}
 
-        router_started = now()
         domain = await self.llm.classify_domain(question, history_string)
-        router_ms = elapsed_ms(router_started)
         logger.info("[router] query=%r domain=%s", question, domain)
-        log_event("ROUTER", "result", domain=domain, elapsed_ms=router_ms)
 
         if domain == "SOCIAL":
             llm_started = now()

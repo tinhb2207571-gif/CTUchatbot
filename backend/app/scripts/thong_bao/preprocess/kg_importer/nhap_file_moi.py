@@ -9,6 +9,7 @@ Ví dụ:
 import argparse
 import json
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,28 @@ def lay_id_thong_bao(du_lieu: dict[str, Any]) -> str:
     return thongbao_id_from_filename(str(metadata.get("ten_file") or ""))
 
 
+def kiem_tra_tieu_de_moi(tx: Any, du_lieu: dict[str, Any]) -> None:
+    """So tiêu đề với ThongBao hiện có; không cần thêm thuộc tính vào graph."""
+    def chuan_hoa(value: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", value).casefold().split())
+
+    title = str(du_lieu["metadata"].get("tieu_de") or "").strip()
+    if not title:
+        raise ValueError("Không trích xuất được tiêu đề Thông báo; chưa thêm vào Knowledge Base.")
+    key = chuan_hoa(title)
+    # Chuẩn hóa cả tiêu đề cũ bằng cùng một hàm, không cần migrate dữ liệu.
+    records = tx.run(
+        "MATCH (tb:ThongBao) WHERE tb.tieu_de IS NOT NULL "
+        "RETURN tb.id AS id, tb.tieu_de AS title"
+    )
+    for record in records:
+        if chuan_hoa(str(record["title"])) == key:
+            raise ValueError(
+                f'Tài liệu đã tồn tại: "{title}" (ID: {record["id"]}). '
+                "Không thêm thông báo trùng tiêu đề vào Knowledge Base."
+            )
+
+
 # Chỉ thêm khi ID chưa có; mọi lỗi đều rollback toàn bộ file đang nhập.
 def them_thong_bao_moi(
     tx: Any,
@@ -68,6 +91,7 @@ def them_thong_bao_moi(
         raise ValueError(
             f"ThongBao '{id_thong_bao}' đã tồn tại; không có dữ liệu nào được thay đổi."
         )
+    kiem_tra_tieu_de_moi(tx, du_lieu)
     return import_thongbao(tx, du_lieu)
 
 
@@ -177,6 +201,7 @@ def nhap_file_moi(duong_dan: Path) -> dict[str, Any]:
                     f"ThongBao '{id_thong_bao}' đã tồn tại; "
                     "không có dữ liệu nào được thay đổi."
                 )
+            kiem_tra_tieu_de_moi(phien, du_lieu)
         model = nap_model_embedding(
             cau_hinh.embedding_model_name,
             cau_hinh.embedding_device,

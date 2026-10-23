@@ -14,6 +14,7 @@ import httpx
 from dotenv import load_dotenv
 from app.core.llm_config import LLM_MODEL
 from app.services.common.streaming import answer_token_handler, stream_ollama_answer
+from app.services.common.pipeline_logger import elapsed_ms, log_event, now
 
 
 def _load_env_files() -> None:
@@ -333,6 +334,7 @@ class LLMService:
         ``history`` được giữ trong chữ ký để tương thích nhưng không đưa vào prompt router,
         tránh lượt hội thoại trước kéo sai domain của câu hiện tại.
         """
+        started = now()
         rule_domain, rule_reason = _high_confidence_domain(query)
         if rule_domain is not None:
             logger.info(
@@ -340,6 +342,10 @@ class LLMService:
                 query,
                 rule_domain,
                 rule_reason,
+            )
+            log_event(
+                "ROUTER", "result", domain=rule_domain, method="rule",
+                reason=rule_reason, llm_ms=0.0, total_ms=elapsed_ms(started),
             )
             return rule_domain
 
@@ -378,12 +384,26 @@ Chỉ trả JSON, không giải thích:
 Câu hỏi:
 {query}
 """
-        data = await call_model_json(LLM_MODEL, prompt, num_predict=32)
+        llm_started = now()
+        try:
+            data = await call_model_json(LLM_MODEL, prompt, num_predict=32)
+        except Exception:
+            log_event(
+                "ROUTER", "result", method="llm", model=LLM_MODEL,
+                status="error", llm_ms=elapsed_ms(llm_started), total_ms=elapsed_ms(started),
+            )
+            raise
+        llm_ms = elapsed_ms(llm_started)
         domain = _normalize_router_domain(data.get("domain") if isinstance(data, dict) else None)
+        fallback = domain is None
         if domain is None:
             logger.warning("[router-llm] output không hợp lệ: %s; fallback=CTDT", data)
-            return "CTDT"
+            domain = "CTDT"
         logger.info("[router-llm] query=%r domain=%s", query, domain)
+        log_event(
+            "ROUTER", "result", domain=domain, method="llm", model=LLM_MODEL,
+            fallback=fallback, llm_ms=llm_ms, total_ms=elapsed_ms(started),
+        )
         return domain
 
     async def generate_without_query(self, query: str, history: str = "") -> str:
