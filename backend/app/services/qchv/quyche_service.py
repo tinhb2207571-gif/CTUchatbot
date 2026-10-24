@@ -231,12 +231,14 @@ class QuyCheService:
         total_started = now()
         import asyncio
 
+        preprocess_started = now()
         question = await asyncio.to_thread(self.llm_service.preprocess_question, query)
         log_event(
             "QCHV",
             "preprocess",
             original_query=query,
             processed_query=question,
+            elapsed_ms=elapsed_ms(preprocess_started),
         )
         if question != query:
             logger.info("[QCHV] preprocess: %r -> %r", query, question)

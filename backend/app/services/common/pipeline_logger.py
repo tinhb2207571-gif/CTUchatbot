@@ -7,6 +7,9 @@ import logging
 import os
 import sys
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
+from uuid import uuid4
 from collections.abc import Iterable
 from typing import Any
 
@@ -40,6 +43,7 @@ def _get_logger() -> logging.Logger:
 
 
 logger = _get_logger()
+_request_timings: ContextVar[dict | None] = ContextVar("request_timings", default=None)
 
 
 def elapsed_ms(started_at: float) -> float:
@@ -71,11 +75,90 @@ def _safe_value(value: Any) -> Any:
 
 def log_event(scope: str, step: str, **fields: Any) -> None:
     """Ghi một sự kiện pipeline dạng JSON trên một dòng."""
+    timings = _request_timings.get()
+    if timings is not None:
+        # Chỉ giữ số đo và trạng thái, không sao chép context/candidate lớn.
+        captured = {
+            key: fields[key] for key in (
+                "elapsed_ms", "total_ms", "llm_ms", "branch_ms", "method", "domain", "executed"
+            ) if key in fields
+        }
+        if captured:
+            timings["events"].append((scope.upper(), step.upper(), captured))
     if not _enabled("PIPELINE_LOG_ENABLED"):
         return
     payload = _safe_value(fields)
     rendered = json.dumps(payload, ensure_ascii=False, default=str)
     logger.info("[%s][%s] %s", scope.upper(), step.upper(), rendered)
+
+
+@contextmanager
+def chat_timing_summary(query: str):
+    """Thu thập số đo riêng cho từng lượt chat, kể cả task/thread con."""
+    timings = {"id": uuid4().hex[:8], "events": [], "started": now()}
+    token = _request_timings.set(timings)
+    status = "Hoàn tất"
+    try:
+        yield
+    except BaseException:
+        status = "Bị ngắt hoặc gặp lỗi"
+        raise
+    finally:
+        _request_timings.reset(token)
+        if _enabled("PIPELINE_LOG_ENABLED"):
+            _log_timing_summary(query, timings, status)
+
+
+def _log_timing_summary(query: str, timings: dict, status: str) -> None:
+    names = {
+        "NORMALIZE": "Chuẩn hóa câu hỏi",
+        "NORMALIZATION": "Chuẩn hóa câu hỏi",
+        "PREPROCESS": "Chuẩn hóa câu hỏi bằng LLM",
+        "ANALYSIS": "Phân tích câu hỏi / chọn văn bản",
+        "EMBEDDING": "Tạo embedding câu hỏi",
+        "RETRIEVAL": "Truy xuất Neo4j",
+        "GRAPH_RETRIEVAL": "Truy xuất graph",
+        "VECTOR_RETRIEVAL": "Truy xuất vector và mở rộng",
+        "RANKING_TOP_K": "Xếp hạng và chọn Top-K",
+        "EXPANSION": "Mở rộng ngữ cảnh",
+        "CONTEXT_BUILD": "Ghép context",
+        "GENERATION": "LLM sinh đáp án",
+        "LLM": "LLM sinh đáp án",
+    }
+    lines = []
+    domain = "Chưa xác định"
+    branch_ms = None
+    total_ms = elapsed_ms(timings["started"])
+
+    def row(label, value):
+        return f"  {label:<42} {float(value) / 1000:>9.3f} s"
+
+    for scope, step, fields in timings["events"]:
+        domain = fields.get("domain", domain)
+        if scope == "ROUTER" and step == "RESULT":
+            method = fields.get("method", "unknown")
+            lines.append(row(f"Router — {method}", fields.get("total_ms", 0)))
+            lines.append(row("  Trong đó: gọi LLM phân loại", fields.get("llm_ms", 0)))
+        elif scope == "CHAT" and step == "DONE":
+            branch_ms = fields.get("branch_ms")
+            total_ms = fields.get("total_ms", total_ms)
+        elif step in names and "elapsed_ms" in fields:
+            label = names[step]
+            if fields.get("executed") is False:
+                lines.append(f"  {label:<42}   Bỏ qua")
+            else:
+                lines.append(row(label, fields["elapsed_ms"]))
+    if not any(scope == "ROUTER" for scope, _, _ in timings["events"]):
+        lines.insert(0, "  Router                                       Không chạy / chưa có kết quả")
+    lines.append("  " + "-" * 54)
+    if branch_ms is not None:
+        lines.append(row(f"Tổng nhánh {domain}", branch_ms))
+    lines.append(row("TỔNG XỬ LÝ CÂU HỎI", total_ms))
+    logger.info(
+        "[CHAT][TIMING_SUMMARY] id=%s | %s | %s\nCâu hỏi: %s\n%s\n"
+        "  (Các dòng tổng và 'trong đó' không cộng thêm vào từng bước.)",
+        timings["id"], domain, status, " ".join(str(query).split())[:160], "\n".join(lines),
+    )
 
 
 def log_context(domain: str, context: str) -> None:

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.services.orchestrator import chat_orchestrator
 from app.services.common.streaming import answer_token_handler
+from app.services.common.pipeline_logger import chat_timing_summary
 
 router = APIRouter()
 
@@ -77,7 +78,8 @@ async def chat(req: ChatRequest):
         async def produce():
             token = answer_token_handler.set(on_token)
             try:
-                result = await chat_orchestrator.handle_query(message, history)
+                with chat_timing_summary(message):
+                    result = await chat_orchestrator.handle_query(message, history)
                 if not emitted:
                     answer = str(result.get("answer", "")).strip()
                     queue.put_nowait(("0", answer or "Mình chưa tìm thấy đủ dữ liệu để trả lời chính xác."))

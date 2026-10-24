@@ -163,6 +163,7 @@ Trả lời ngắn gọn, chính xác, đúng trọng tâm và chỉ dùng thôn
         cleaned_history = normalize_history(history)
         history_string = history_text(cleaned_history)
 
+        normalization_started = now()
         normalization = normalize_ctdt_query(query)
         normalized_query = normalization["normalized_query"] or query
         log_event(
@@ -171,6 +172,7 @@ Trả lời ngắn gọn, chính xác, đúng trọng tâm và chỉ dùng thôn
             original_query=query,
             normalized_query=normalized_query,
             applied_rules=normalization["applied_rules"],
+            elapsed_ms=elapsed_ms(normalization_started),
         )
 
         analysis_started = now()

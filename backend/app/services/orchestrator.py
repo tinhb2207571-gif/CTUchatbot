@@ -48,30 +48,32 @@ class ChatOrchestrator:
             history_count=len(cleaned_history),
         )
 
+        branch_started = now()
         if not question:
             llm_started = now()
             answer = await self.llm.generate_without_query(question, history_string)
             log_event("SOCIAL", "llm", elapsed_ms=elapsed_ms(llm_started))
             log_answer("SOCIAL", answer)
-            log_event("CHAT", "done", domain="SOCIAL", total_ms=elapsed_ms(total_started))
+            log_event("CHAT", "done", domain="SOCIAL", total_ms=elapsed_ms(total_started), branch_ms=elapsed_ms(branch_started))
             return {"answer": answer, "domain": "SOCIAL", "debug": {"reason": "empty_query"}}
 
         domain = await self.llm.classify_domain(question, history_string)
         logger.info("[router] query=%r domain=%s", question, domain)
+        branch_started = now()
 
         if domain == "SOCIAL":
             llm_started = now()
             answer = await self.llm.generate_without_query(question, history_string)
             log_event("SOCIAL", "llm", elapsed_ms=elapsed_ms(llm_started))
             log_answer(domain, answer)
-            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started))
+            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started), branch_ms=elapsed_ms(branch_started))
             return {"answer": answer, "domain": domain, "debug": {}}
 
         if domain == "QCHV":
             result = await quyche_service.handle_query(question, cleaned_history)
             answer = str(result.get("answer", "")).strip()
             log_answer(domain, answer)
-            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started))
+            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started), branch_ms=elapsed_ms(branch_started))
             return {
                 "answer": answer,
                 "domain": domain,
@@ -85,7 +87,7 @@ class ChatOrchestrator:
         if domain == "CTDT":
             result = await ctdt_pipeline.handle_query(question, cleaned_history)
             log_answer(domain, result.answer)
-            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started))
+            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started), branch_ms=elapsed_ms(branch_started))
             return {
                 "answer": result.answer,
                 "domain": domain,
@@ -121,7 +123,7 @@ class ChatOrchestrator:
                 elapsed_ms=elapsed_ms(generation_started),
             )
             log_answer(domain, answer)
-            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started))
+            log_event("CHAT", "done", domain=domain, total_ms=elapsed_ms(total_started), branch_ms=elapsed_ms(branch_started))
             return {
                 "answer": answer,
                 "domain": domain,
