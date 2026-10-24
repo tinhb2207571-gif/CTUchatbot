@@ -240,7 +240,7 @@ History:
 Query:
 {query}
 """
-    raw = await call_model_json(LLM_MODEL, prompt, num_predict=4096)
+    raw = await call_model_json(LLM_MODEL, prompt, num_predict=12000)
     normalized = _normalize_analysis_payload(raw, query)
     if not raw or not normalized["entities"]:
         logger.warning(
