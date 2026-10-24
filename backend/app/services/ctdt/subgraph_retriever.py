@@ -476,7 +476,7 @@ class SubgraphRetriever:
         for node in nodes_by_id.values():
             label = node["labels"][0] if node.get("labels") else "Node"
             name = self._pick_name(node.get("props", {}))
-            summary_props = self._pick_props(node.get("props", {}))
+            summary_props = self._pick_props(node.get("props", {}), node.get("labels") or [])
             if summary_props:
                 node_lines.append(f"- {label}: {name} ({summary_props})")
             else:
@@ -511,7 +511,14 @@ class SubgraphRetriever:
                 return str(value).strip()
         return "(không rõ)"
 
-    def _pick_props(self, props: Dict[str, Any]) -> str:
+    def _pick_props(self, props: Dict[str, Any], labels: List[str] | None = None) -> str:
+        if "ChuongTrinhDaoTao" in (labels or []):
+            return ", ".join(
+                f"{key}={props[key]}"
+                for key in ("khoa", "he", "tong_tin_chi", "thoi_gian_dao_tao")
+                if props.get(key) is not None and str(props[key]).strip()
+            )
+
         parts: List[str] = []
         seen = set()
         for key in _PROP_KEYS:

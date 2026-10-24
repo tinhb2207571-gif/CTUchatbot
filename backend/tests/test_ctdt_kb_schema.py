@@ -11,7 +11,7 @@ from app.services.ctdt import vector_retriever
 
 
 class CTDTContextTests(unittest.TestCase):
-    def test_program_context_uses_original_three_property_summary(self):
+    def test_program_context_keeps_four_requested_properties(self):
         nodes = {1: {"labels": ["ChuongTrinhDaoTao", "Entity"], "props": {
             "id": "7480101_51_STD", "ma_chuong_trinh": "7480101_51_STD",
             "khoa": 51, "he": "Đại trà", "tong_tin_chi": 161,
@@ -20,8 +20,23 @@ class CTDTContextTests(unittest.TestCase):
         }}}
         context = SubgraphRetriever().serialize_subgraph(nodes, {})
         self.assertEqual(context, "[GRAPH RESULT]\nCác nút liên quan:\n"
-                         "- ChuongTrinhDaoTao: 7480101_51_STD (khoa=51, he=Đại trà, tong_tin_chi=161)")
+                         "- ChuongTrinhDaoTao: 7480101_51_STD (khoa=51, he=Đại trà, tong_tin_chi=161, thoi_gian_dao_tao=4.5)")
         self.assertNotIn("embedding", context)
+
+    def test_program_gets_duration_even_when_entity_is_first_label(self):
+        context = SubgraphRetriever().serialize_subgraph({1: {
+            "labels": ["Entity", "ChuongTrinhDaoTao"],
+            "props": {"ma_chuong_trinh": "7480101_51_STD", "khoa": 51,
+                      "he": "Đại trà", "tong_tin_chi": 161, "thoi_gian_dao_tao": 4.5},
+        }}, {})
+        self.assertIn("thoi_gian_dao_tao=4.5", context)
+
+    def test_missing_duration_is_not_invented_or_replaced_by_other_property(self):
+        summary = SubgraphRetriever()._pick_props({
+            "khoa": 51, "he": "Đại trà", "tong_tin_chi": 161,
+            "thoi_gian_dao_tao": None, "text": "Văn bản dài", "embedding": [0.1],
+        }, ["ChuongTrinhDaoTao"])
+        self.assertEqual(summary, "khoa=51, he=Đại trà, tong_tin_chi=161")
 
     def test_course_context_matches_original_summary(self):
         context = SubgraphRetriever().serialize_subgraph({1: {
