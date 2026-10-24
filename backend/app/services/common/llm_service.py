@@ -229,12 +229,12 @@ async def call_model(
     temperature: float = 0.3,
     keep_alive: str = "1h",
     *,
-    think: bool = False,
+    think: bool = True,
     num_predict: int | None = None,
 ) -> str:
     """Gọi Ollama bằng /api/generate; fallback /api/chat nếu endpoint generate không có.
 
-    Với pipeline retrieval, mặc định tắt thinking để tránh model suy luận dài không cần thiết.
+    Mặc định bật thinking; chỉ phần trả lời cuối được chuyển cho người dùng.
     ``num_predict`` cho phép từng tác vụ giới hạn số token đầu ra riêng.
     """
     options: Dict[str, Any] = {"temperature": temperature}
@@ -293,14 +293,14 @@ async def call_model_json(
     model: str,
     prompt: str,
     *,
-    num_predict: int = 768,
+    num_predict: int = 2048,
 ) -> Dict[str, Any]:
     return _extract_json_object(
         await call_model(
             model,
             prompt,
             temperature=0.0,
-            think=False,
+            think=True,
             num_predict=num_predict,
         )
     )
@@ -310,19 +310,19 @@ async def call_llm(
     prompt: str,
     temperature: float = 0.3,
     *,
-    num_predict: int = 512,
+    num_predict: int = 2048,
 ) -> str:
     if answer_token_handler.get() is not None:
         return await stream_ollama_answer(
             LLM_MODEL, prompt, generate_url=OLLAMA_GENERATE_URL,
             chat_url=OLLAMA_CHAT_URL, timeout=DEFAULT_TIMEOUT_SECONDS,
-            temperature=temperature, num_predict=num_predict, think=False,
+            temperature=temperature, num_predict=num_predict, think=True,
         )
     return await call_model(
         LLM_MODEL,
         prompt,
         temperature=temperature,
-        think=False,
+        think=True,
         num_predict=num_predict,
     )
 
@@ -386,7 +386,7 @@ Câu hỏi:
 """
         llm_started = now()
         try:
-            data = await call_model_json(LLM_MODEL, prompt, num_predict=32)
+            data = await call_model_json(LLM_MODEL, prompt, num_predict=2048)
         except Exception:
             log_event(
                 "ROUTER", "result", method="llm", model=LLM_MODEL,
@@ -417,7 +417,7 @@ History:
 User:
 {query}
 """
-        return (await call_llm(prompt, temperature=0.4, num_predict=128)).strip()
+        return (await call_llm(prompt, temperature=0.4, num_predict=2048)).strip()
 
     async def normalize_notification_query(self, query: str) -> str:
         """Chuẩn hóa câu THONG_BAO nhưng bảo vệ mọi số và định danh exact."""
@@ -447,7 +447,7 @@ Câu hỏi gốc:
             data = await call_model_json(
                 LLM_MODEL,
                 prompt,
-                num_predict=128,
+                num_predict=2048,
             )
         except Exception as exc:
             logger.warning("[notification_normalizer] lỗi LLM, dùng câu gốc: %s", exc)
@@ -483,4 +483,4 @@ Câu hỏi:
 
 Trả lời ngắn gọn và trực tiếp.
 """
-        return (await call_llm(prompt, temperature=0.2, num_predict=256)).strip()
+        return (await call_llm(prompt, temperature=0.2, num_predict=2048)).strip()

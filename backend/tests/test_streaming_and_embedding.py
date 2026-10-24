@@ -30,12 +30,14 @@ class OllamaStreamingTests(unittest.IsolatedAsyncioTestCase):
         tokens = []
         token = answer_token_handler.set(tokens.append)
         try:
-            with patch.object(llm_service, "call_model", new_callable=AsyncMock, return_value='{"ok": true}'):
+            with patch.object(llm_service, "call_model", new_callable=AsyncMock, return_value='{"ok": true}') as call:
                 result = await llm_service.call_model_json("test", "analyze")
         finally:
             answer_token_handler.reset(token)
         self.assertEqual(result, {"ok": True})
         self.assertEqual(tokens, [])
+        self.assertTrue(call.call_args.kwargs["think"])
+        self.assertEqual(call.call_args.kwargs["num_predict"], 2048)
 
     async def run_stream(self, handler):
         real_client = httpx.AsyncClient
@@ -56,7 +58,7 @@ class OllamaStreamingTests(unittest.IsolatedAsyncioTestCase):
         def handler(request):
             payload = json.loads(request.content)
             self.assertTrue(payload["stream"])
-            self.assertFalse(payload["think"])
+            self.assertTrue(payload["think"])
             return httpx.Response(200, text='{"thinking":"hidden","response":"Xin "}\n{"response":"chào","done":true}\n')
         answer, tokens = await self.run_stream(handler)
         self.assertEqual(tokens, ["Xin ", "chào"])
@@ -149,4 +151,4 @@ class QuyCheStreamingTests(unittest.TestCase):
         self.assertEqual(answer, "Xin chào")
         self.assertEqual(tokens, ["Xin ", "chào"])
         self.assertTrue(post.call_args.kwargs["stream"])
-        self.assertFalse(post.call_args.kwargs["json"]["think"])
+        self.assertTrue(post.call_args.kwargs["json"]["think"])

@@ -237,7 +237,7 @@ History:
 Query:
 {query}
 """
-    raw = await call_model_json(LLM_MODEL, prompt, num_predict=768)
+    raw = await call_model_json(LLM_MODEL, prompt, num_predict=2048)
     normalized = _normalize_analysis_payload(raw, query)
     if not normalized.get("vector_targets"):
         normalized["vector_targets"] = []

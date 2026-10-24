@@ -38,7 +38,7 @@ assert QuyCheLLMService().model_primary == LLM_MODEL
                 coroutine.send(None)
             self.assertEqual(completed.exception.value, "ok")
         call.assert_awaited_once_with(
-            llm_service.LLM_MODEL, "question", temperature=0.7, think=False, num_predict=42,
+            llm_service.LLM_MODEL, "question", temperature=0.7, think=True, num_predict=42,
         )
 
     def test_qchv_keeps_its_own_request_options(self):
@@ -49,5 +49,5 @@ assert QuyCheLLMService().model_primary == LLM_MODEL
             self.assertEqual(service._call_llm([], temperature=0.6, num_predict=99), "answer")
         payload = post.call_args.kwargs["json"]
         self.assertEqual(payload["model"], llm_service.LLM_MODEL)
-        self.assertFalse(payload["think"])
+        self.assertTrue(payload["think"])
         self.assertEqual(payload["options"], {"temperature": 0.6, "num_predict": 99})

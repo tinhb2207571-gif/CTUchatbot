@@ -12,7 +12,7 @@ answer_token_handler: ContextVar[Optional[Callable[[str], None]]] = ContextVar(
 
 
 async def stream_ollama_answer(model, prompt, *, generate_url, chat_url, timeout,
-                               temperature, num_predict, think=False):
+                               temperature, num_predict, think=True):
     """Giữ kết quả đầy đủ cho caller và phát từng phần cho request hiện tại."""
     handler = answer_token_handler.get()
     parts = []

@@ -156,7 +156,7 @@ Context:
 
 Trả lời ngắn gọn, chính xác, đúng trọng tâm và chỉ dùng thông tin trong context.
 """
-        return (await call_llm(prompt, temperature=0.2, num_predict=256)).strip()
+        return (await call_llm(prompt, temperature=0.2, num_predict=2048)).strip()
 
     async def handle_query(self, query: str, history: List[Dict[str, Any]]) -> CTDTPipelineResult:
         total_started = now()
