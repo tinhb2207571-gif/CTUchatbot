@@ -98,6 +98,12 @@ def _high_confidence_domain(query: str) -> tuple[str | None, str | None]:
     if not text:
         return "SOCIAL", "empty_query"
 
+    # Tiền tố do người dùng chỉ định để test từng luồng, ưu tiên trước mọi rule.
+    explicit = re.match(r"^theo\s+(thong\s+bao|qchv|ctdt)\b", text)
+    if explicit:
+        domain = {"thong bao": "THONG_BAO", "qchv": "QCHV", "ctdt": "CTDT"}[explicit.group(1)]
+        return domain, "explicit_domain"
+
     # SOCIAL chỉ bắt câu xã giao thuần túy; nếu có nội dung học vụ thì để LLM xử lý.
     social_patterns = (
         r"^(xin )?(chao|hello|hi)( ban| chatbot| tro ly)?[.!? ]*$",
