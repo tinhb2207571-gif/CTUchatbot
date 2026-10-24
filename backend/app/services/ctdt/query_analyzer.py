@@ -216,6 +216,7 @@ Ràng buộc bắt buộc:
 - Chỉ dùng 1 lần gọi LLM.
 - rewrite phải là câu hỏi độc lập, rõ nghĩa, dùng lịch sử chat nếu cần.
 - entities chỉ chứa thực thể thật xuất hiện hoặc suy ra trực tiếp từ câu hỏi.
+- Giữ nguyên dấu tiếng Việt trong tên thực thể; không chuyển tên ngành sang dạng không dấu.
 - relations chỉ lấy từ schema, nếu không chắc thì [].
 - query_type chọn đúng 1 giá trị.
 - attribute: hỏi một thuộc tính cụ thể của một thực thể.
