@@ -223,6 +223,27 @@ def _valid_notification_normalization(original: str, normalized: object) -> str 
     return candidate
 
 
+def _log_ollama_completion(
+    payload: Dict[str, Any], content: str, *, model: str, endpoint: str,
+    think: bool, num_predict: int | None,
+) -> None:
+    message = payload.get("message") or {}
+    thinking = payload.get("thinking") or message.get("thinking") or ""
+    fields = {
+        "model": model, "endpoint": endpoint, "think": think,
+        "num_predict": num_predict,
+        "done": payload.get("done"),
+        "done_reason": payload.get("done_reason"),
+        "eval_count": payload.get("eval_count"),
+        "prompt_eval_count": payload.get("prompt_eval_count"),
+        "response_chars": len(content), "thinking_chars": len(thinking),
+    }
+    # Thiếu metadata được giữ là null, không suy đoán lý do dừng.
+    warn = not content.strip() or payload.get("done_reason") == "length"
+    log = logger.warning if warn else logger.info
+    log("[LLM][COMPLETION] %s", json.dumps(fields, ensure_ascii=False))
+
+
 async def call_model(
     model: str,
     prompt: str,
@@ -265,6 +286,10 @@ async def call_model(
             content = payload.get("response")
             if not isinstance(content, str):
                 raise RuntimeError(f"Invalid Ollama generate response: {payload}")
+            _log_ollama_completion(
+                payload, content, model=model, endpoint="generate",
+                think=think, num_predict=num_predict,
+            )
             return content
         except httpx.HTTPStatusError as exc:
             if exc.response is None or exc.response.status_code != 404:
@@ -286,6 +311,10 @@ async def call_model(
         content = (payload.get("message") or {}).get("content")
         if not isinstance(content, str):
             raise RuntimeError(f"Invalid Ollama chat response: {payload}")
+        _log_ollama_completion(
+            payload, content, model=model, endpoint="chat",
+            think=think, num_predict=num_predict,
+        )
         return content
 
 
@@ -295,15 +324,23 @@ async def call_model_json(
     *,
     num_predict: int = 4096,
 ) -> Dict[str, Any]:
-    return _extract_json_object(
-        await call_model(
-            model,
-            prompt,
-            temperature=0.0,
-            think=True,
-            num_predict=num_predict,
-        )
+    content = await call_model(
+        model,
+        prompt,
+        temperature=0.0,
+        think=True,
+        num_predict=num_predict,
     )
+    data = _extract_json_object(content)
+    if not data:
+        reason = "empty_response" if not content.strip() else "empty_or_invalid_json_object"
+        logger.warning("[LLM][JSON_WARNING] %s", json.dumps({
+            "model": model, "reason": reason,
+            "response_chars": len(content),
+            "response_preview": content[:2000],
+            "preview_truncated": len(content) > 2000,
+        }, ensure_ascii=False))
+    return data
 
 
 async def call_llm(

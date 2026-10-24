@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
+import logging
 from typing import Any, Dict, List
 
 from app.core.llm_config import LLM_MODEL
 from app.services.common.llm_service import call_model_json
 from app.services.ctdt.schema import GRAPH_SCHEMA
+
+logger = logging.getLogger("app.ctdt.analysis")
 
 _ALLOWED_VECTOR_TARGETS = {"HocPhan", "DieuKienTotNghiep", "ChuanDauRa", "VanBanPhapLy"}
 _ALLOWED_GRAPH_RELATIONS = {
@@ -239,6 +242,13 @@ Query:
 """
     raw = await call_model_json(LLM_MODEL, prompt, num_predict=4096)
     normalized = _normalize_analysis_payload(raw, query)
+    if not raw or not normalized["entities"]:
+        logger.warning(
+            "[CTDT][ANALYSIS_WARNING] reason=%s model=%s query=%r; "
+            "xem [LLM][COMPLETION] và [LLM][JSON_WARNING] để kiểm tra đầu ra Ollama",
+            "empty_analysis" if not raw else "no_entities",
+            LLM_MODEL, query,
+        )
     if not normalized.get("vector_targets"):
         normalized["vector_targets"] = []
     return normalized
