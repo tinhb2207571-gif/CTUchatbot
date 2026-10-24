@@ -203,34 +203,37 @@ Phải trả về JSON STRICT với format sau:
   "query_type": "attribute | relation | path | aggregation | description | list",
   "constraints": {{"depth": 2, "limit": 10}},
   "ctdt_filters": {{"khoa": 51, "he": "đại trà"}},
-  "vector_targets": ["HocPhan", "DieuKienTotNghiep", "ChuanDauRa", "VanBanPhapLy"],
-  "graph_plan": {{
-    "anchor_node_types": ["HocPhan", "Nganh", "ChuongTrinhDaoTao"],
-    "focus_relations": ["YEU_CAU_TIEN_QUYET", "CO_THE_SONG_HANH", "GOM", "CO", "YEU_CAU", "THUOC_VE"],
-    "expansion_policy": {{"max_depth": 2, "max_paths": 60, "max_nodes": 70}},
-    "answer_shape": "single | list | path | summary"
-  }}
+    "vector_targets": ["HocPhan", "DieuKienTotNghiep", "ChuanDauRa", "VanBanPhapLy"],
+    "graph_plan": {{
+            "anchor_node_types": ["HocPhan", "Nganh", "ChuongTrinhDaoTao"],
+            "focus_relations": ["YEU_CAU_TIEN_QUYET", "CO_THE_SONG_HANH", "GOM", "CO", "YEU_CAU", "THUOC_VE"],
+            "expansion_policy": {{"max_depth": 2, "max_paths": 60, "max_nodes": 70}},
+            "answer_shape": "single | list | path | summary"
+    }}
 }}
 
 Ràng buộc bắt buộc:
 - Chỉ dùng 1 lần gọi LLM.
 - rewrite phải là câu hỏi độc lập, rõ nghĩa, dùng lịch sử chat nếu cần.
-- entities chỉ chứa thực thể thật xuất hiện hoặc suy ra trực tiếp từ câu hỏi.
-- Giữ nguyên dấu tiếng Việt trong tên thực thể; không chuyển tên ngành sang dạng không dấu.
-- relations chỉ lấy từ schema, nếu không chắc thì [].
-- query_type chọn đúng 1 giá trị.
-- attribute: hỏi một thuộc tính cụ thể của một thực thể.
-- relation: hỏi các thực thể liên quan qua một quan hệ.
-- path: hỏi đường đi/chuỗi quan hệ.
-- aggregation: thống kê tổng hợp nhiều bản ghi, không dùng cho thuộc tính đơn lẻ.
-- description: mô tả chung, chưa đủ tín hiệu cho nhánh cụ thể.
-- list: yêu cầu liệt kê danh sách.
-- Với "tổng số tín chỉ cần hoàn thành của CTDT", ưu tiên query_type="attribute" và thuộc tính ct.tong_tin_chi.
-- constraints chỉ điền khi thực sự cần; nếu không có thì {{}}.
+- entities là danh sách linh hoạt, chỉ chứa thực thể thật xuất hiện hoặc suy ra trực tiếp từ câu hỏi.
+- relations chỉ lấy từ schema, nếu không chắc thì []
+- query_type chọn 1 giá trị duy nhất.
+- Định nghĩa query_type:
+    + attribute: hỏi 1 thuộc tính cụ thể của 1 thực thể (ví dụ: tong_tin_chi của ChuongTrinhDaoTao, so_tin_chi của HocPhan).
+    + relation: hỏi các thực thể liên quan qua 1 quan hệ (ví dụ: CTDT có những ChuanDauRa nào).
+    + path: hỏi đường đi/chuỗi quan hệ giữa các thực thể.
+    + aggregation: hỏi thống kê tổng hợp nhiều bản ghi (count/sum/group), KHÔNG dùng cho thuộc tính đơn lẻ của 1 thực thể.
+    + description: câu mô tả chung, chưa đủ tín hiệu để chọn nhánh cụ thể.
+    + list: yêu cầu liệt kê danh sách (ưu tiên trả nhiều bản ghi).
+- Với câu hỏi "tổng số tín chỉ cần hoàn thành của CTDT" thì ưu tiên query_type="attribute" và trọng tâm thuộc tính ct.tong_tin_chi.
+- constraints chỉ điền khi thực sự cần; nếu không có thì {{}}
 - ctdt_filters chỉ chứa giá trị được nêu rõ; KHÔNG tự thêm default khoa/he.
-- vector_targets chỉ chọn trong: HocPhan, DieuKienTotNghiep, ChuanDauRa, VanBanPhapLy.
-- Nếu không chắc thì vector_targets = [].
-- graph_plan phải tương thích schema.
+- vector_targets chỉ chọn trong tập: HocPhan, DieuKienTotNghiep, ChuanDauRa, VanBanPhapLy.
+- Nếu không chắc thì vector_targets = []
+- graph_plan phải tương thích schema:
+    + anchor_node_types chỉ dùng label có trong schema.
+    + focus_relations chỉ dùng quan hệ có trong schema.
+    + answer_shape mô tả dạng đầu ra mong muốn, không ảnh hưởng trực tiếp tới Cypher.
 
 Schema:
 {GRAPH_SCHEMA}

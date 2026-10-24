@@ -11,20 +11,19 @@ from app.services.ctdt import vector_retriever
 
 
 class CTDTContextTests(unittest.TestCase):
-    def test_program_keeps_duration_and_credits_with_entity_label_first(self):
-        nodes = {1: {"labels": ["Entity", "ChuongTrinhDaoTao"], "props": {
+    def test_program_context_uses_original_three_property_summary(self):
+        nodes = {1: {"labels": ["ChuongTrinhDaoTao", "Entity"], "props": {
             "id": "7480101_51_STD", "ma_chuong_trinh": "7480101_51_STD",
             "khoa": 51, "he": "Đại trà", "tong_tin_chi": 161,
             "thoi_gian_dao_tao": 4.5, "ngon_ngu": "Tiếng Việt",
             "thang_diem": 4, "embedding": [0.123],
         }}}
         context = SubgraphRetriever().serialize_subgraph(nodes, {})
-        self.assertIn("- ChuongTrinhDaoTao:", context)
-        for value in ("tong_tin_chi=161", "thoi_gian_dao_tao=4.5", "he=Đại trà", "thang_diem=4"):
-            self.assertIn(value, context)
+        self.assertEqual(context, "[GRAPH RESULT]\nCác nút liên quan:\n"
+                         "- ChuongTrinhDaoTao: 7480101_51_STD (khoa=51, he=Đại trà, tong_tin_chi=161)")
         self.assertNotIn("embedding", context)
 
-    def test_course_keeps_conditions_and_zero_credit_values(self):
+    def test_course_context_matches_original_summary(self):
         context = SubgraphRetriever().serialize_subgraph({1: {
             "labels": ["HocPhan", "Entity"], "props": {
                 "ma_hoc_phan": "CT101", "ten_hoc_phan": "Lập trình",
@@ -32,13 +31,13 @@ class CTDTContextTests(unittest.TestCase):
                 "dieu_kien": "Đạt CT100", "yeu_cau_stc_toi_thieu": 30,
             },
         }}, {})
-        self.assertIn("dieu_kien=Đạt CT100", context)
-        self.assertIn("yeu_cau_stc_toi_thieu=30", context)
-        self.assertIn("so_tiet_ly_thuyet=0", context)
-        self.assertIn("bat_buoc=False", context)
+        self.assertEqual(context, "[GRAPH RESULT]\nCác nút liên quan:\n"
+                         "- HocPhan: Lập trình (ma_hoc_phan=CT101, ten_hoc_phan=Lập trình, so_tin_chi=3)")
 
-    def test_faculty_name_uses_current_kb_property(self):
-        self.assertEqual(SubgraphRetriever()._pick_name({"id": "CNTT", "ten_khoa": "Công nghệ thông tin"}), "Công nghệ thông tin")
+    def test_zero_and_false_values_are_not_dropped_from_original_fallback(self):
+        summary = SubgraphRetriever()._pick_props({"so_tiet_ly_thuyet": 0, "bat_buoc": False})
+        self.assertIn("so_tiet_ly_thuyet=0", summary)
+        self.assertIn("bat_buoc=False", summary)
 
 
 class CTDTExtractionTests(unittest.TestCase):

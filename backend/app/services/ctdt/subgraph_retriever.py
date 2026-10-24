@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-import unicodedata
 from typing import Any, Dict, List, Tuple
 
-from app.db.neo4j import get_driver, read_query
-from app.services.ctdt.schema import CTDT_NODE_PROPERTIES
+from app.db.neo4j import get_driver
 
 DEFAULT_KHOA = 51
 DEFAULT_HE = "đại trà"
@@ -14,14 +12,6 @@ DEFAULT_HE = "đại trà"
 _NAME_KEYS = (
     "ten_hoc_phan",
     "ten_nganh_vi",
-    "ten_khoa",
-    "ten_bo_mon",
-    "ten_trinh_do",
-    "loai_van_bang",
-    "ten_hinh_thuc",
-    "ten_phuong_thuc",
-    "ten_nhom",
-    "noi_dung_yeu_cau",
     "ten_khoi",
     "ten",
     "noi_dung",
@@ -79,12 +69,6 @@ def _is_embedding_key(key: str) -> bool:
     return "embedding" in lowered or lowered.endswith("_vector") or lowered == "vector"
 
 
-def _fold_entity_name(value: Any) -> str:
-    text = unicodedata.normalize("NFD", str(value or "").casefold())
-    text = "".join(char for char in text if not unicodedata.combining(char))
-    return " ".join(text.replace("đ", "d").split())
-
-
 def _sanitize_props(props: Dict[str, Any]) -> Dict[str, Any]:
     cleaned: Dict[str, Any] = {}
     for key, value in (props or {}).items():
@@ -139,11 +123,7 @@ class SubgraphRetriever:
                 is_graph_sufficient=False,
             )
 
-        seed_rows, entity_resolution = self._resolve_major_seeds(entities, filters)
-        if not seed_rows or any(
-            isinstance(entity, dict) and entity.get("type") != "Nganh" for entity in entities
-        ):
-            seed_rows = seed_rows + self._fetch_seed_nodes(keywords, filters)
+        seed_rows = self._fetch_seed_nodes(keywords, filters)
         seed_ids = self._prioritize_seed_ids(seed_rows, anchor_node_types)
 
         if not seed_ids:
@@ -154,7 +134,6 @@ class SubgraphRetriever:
                     "keywords": keywords,
                     "seed_count": 0,
                     "filters": filters,
-                    "entity_resolution": entity_resolution,
                 },
                 used_default_ctdt=used_default,
                 is_graph_sufficient=False,
@@ -168,7 +147,6 @@ class SubgraphRetriever:
             graph_text=graph_text,
             metadata={
                 "keywords": keywords,
-                "entity_resolution": entity_resolution,
                 "filters": filters,
                 "seed_count": len(seed_ids),
                 "node_count": len(nodes_by_id),
@@ -282,51 +260,6 @@ class SubgraphRetriever:
             deduped.append(kw.strip())
 
         return deduped[:8]
-
-    def _resolve_major_seeds(
-        self, entities: List[Dict[str, Any]], filters: Dict[str, Any],
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        values = [
-            str(entity.get("value") or "").strip()
-            for entity in entities
-            if isinstance(entity, dict) and entity.get("type") == "Nganh"
-            and str(entity.get("value") or "").strip()
-        ]
-        if not values:
-            return [], []
-
-        # Danh mục ngành nhỏ; đối chiếu trong Python để không cần APOC hoặc
-        # thêm thuộc tính không dấu vào KB. Giữ đúng bộ lọc chương trình.
-        candidates = read_query("""
-            MATCH (ct:ChuongTrinhDaoTao)-[:THUOC_VE]->(n:Nganh)
-            WHERE ($khoa IS NULL OR toString(ct.khoa) = toString($khoa))
-              AND ($he IS NULL OR toLower(trim(coalesce(ct.he, ''))) = toLower(trim($he)))
-            RETURN DISTINCT id(n) AS seed_id, labels(n) AS labels,
-                   n {.id, .ma_nganh, .ten_nganh_vi, .ten_nganh_en} AS props
-        """, {"khoa": filters.get("khoa"), "he": filters.get("he")})
-        seeds: Dict[int, Dict[str, Any]] = {}
-        resolutions: List[Dict[str, Any]] = []
-        for value in values:
-            folded = _fold_entity_name(value)
-            matches = {
-                row["seed_id"]: row for row in candidates
-                if any(
-                    _fold_entity_name(row["props"].get(key)) == folded
-                    for key in ("id", "ma_nganh", "ten_nganh_vi", "ten_nganh_en")
-                )
-            }
-            # Không tự chọn một ngành nếu nhiều node có cùng tên sau chuẩn hóa.
-            if len(matches) != 1:
-                resolutions.append({"input": value, "status": "ambiguous" if matches else "not_found"})
-                continue
-            seed_id, row = next(iter(matches.items()))
-            seeds[seed_id] = row
-            resolutions.append({
-                "input": value, "status": "matched", "node_id": row["props"].get("id"),
-                "canonical_name": row["props"].get("ten_nganh_vi"),
-                "method": "exact_folded_name_or_code",
-            })
-        return list(seeds.values()), resolutions
 
     def _fetch_seed_nodes(self, keywords: List[str], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         cypher = """
@@ -541,10 +474,9 @@ class SubgraphRetriever:
 
         node_lines: List[str] = []
         for node in nodes_by_id.values():
-            labels = node.get("labels") or []
-            label = next((item for item in labels if item in CTDT_NODE_PROPERTIES), labels[0] if labels else "Node")
+            label = node["labels"][0] if node.get("labels") else "Node"
             name = self._pick_name(node.get("props", {}))
-            summary_props = self._pick_props(node.get("props", {}), label)
+            summary_props = self._pick_props(node.get("props", {}))
             if summary_props:
                 node_lines.append(f"- {label}: {name} ({summary_props})")
             else:
@@ -579,16 +511,7 @@ class SubgraphRetriever:
                 return str(value).strip()
         return "(không rõ)"
 
-    def _pick_props(self, props: Dict[str, Any], label: str = "") -> str:
-        if label in CTDT_NODE_PROPERTIES:
-            parts = [
-                f"{key}={props[key]}"
-                for key in CTDT_NODE_PROPERTIES[label]
-                if props.get(key) is not None and str(props[key]).strip()
-            ]
-            if parts:
-                return ", ".join(parts)
-
+    def _pick_props(self, props: Dict[str, Any]) -> str:
         parts: List[str] = []
         seen = set()
         for key in _PROP_KEYS:
