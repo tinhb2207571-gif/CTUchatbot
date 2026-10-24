@@ -114,7 +114,7 @@ class QuyCheLLMService:
         messages: list,
         temperature: float = 0.1,
         *,
-        num_predict: int = 2048,
+        num_predict: int = 4096,
         stream_answer: bool = False,
     ) -> str:
         url = OLLAMA_CHAT_URL
@@ -161,7 +161,7 @@ class QuyCheLLMService:
             {"role": "system", "content": PREPROCESS_SYSTEM},
             {"role": "user",   "content": raw.strip()},
         ]
-        result = self._call_llm(msgs, temperature=0.0, num_predict=2048)
+        result = self._call_llm(msgs, temperature=0.0, num_predict=4096)
         if not result or len(result) > 500:
             return raw
         return result.strip()
@@ -182,7 +182,7 @@ class QuyCheLLMService:
             {"role": "system", "content": VANBAN_CLASSIFY_SYSTEM},
             {"role": "user",   "content": question},
         ]
-        raw_out = self._call_llm(msgs, temperature=0.0, num_predict=2048).strip().lower()
+        raw_out = self._call_llm(msgs, temperature=0.0, num_predict=4096).strip().lower()
         for key in VANBAN_MAP:
             if key in raw_out:
                 result = VANBAN_MAP[key]
@@ -209,7 +209,7 @@ class QuyCheLLMService:
             + history_msgs
             + [{"role": "user", "content": user_content}]
         )
-        return self._call_llm(messages, temperature=0.2, num_predict=2048, stream_answer=True)
+        return self._call_llm(messages, temperature=0.2, num_predict=4096, stream_answer=True)
 
 
 quyche_llm_service = QuyCheLLMService()

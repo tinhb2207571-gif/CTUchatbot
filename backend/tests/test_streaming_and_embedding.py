@@ -37,7 +37,7 @@ class OllamaStreamingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"ok": True})
         self.assertEqual(tokens, [])
         self.assertTrue(call.call_args.kwargs["think"])
-        self.assertEqual(call.call_args.kwargs["num_predict"], 2048)
+        self.assertEqual(call.call_args.kwargs["num_predict"], 4096)
 
     async def run_stream(self, handler):
         real_client = httpx.AsyncClient

@@ -230,7 +230,7 @@ async def call_model(
     keep_alive: str = "1h",
     *,
     think: bool = True,
-    num_predict: int | None = None,
+    num_predict: int | None = 4096,
 ) -> str:
     """Gọi Ollama bằng /api/generate; fallback /api/chat nếu endpoint generate không có.
 
@@ -293,7 +293,7 @@ async def call_model_json(
     model: str,
     prompt: str,
     *,
-    num_predict: int = 2048,
+    num_predict: int = 4096,
 ) -> Dict[str, Any]:
     return _extract_json_object(
         await call_model(
@@ -310,7 +310,7 @@ async def call_llm(
     prompt: str,
     temperature: float = 0.3,
     *,
-    num_predict: int = 2048,
+    num_predict: int = 4096,
 ) -> str:
     if answer_token_handler.get() is not None:
         return await stream_ollama_answer(
@@ -386,7 +386,7 @@ Câu hỏi:
 """
         llm_started = now()
         try:
-            data = await call_model_json(LLM_MODEL, prompt, num_predict=2048)
+            data = await call_model_json(LLM_MODEL, prompt, num_predict=4096)
         except Exception:
             log_event(
                 "ROUTER", "result", method="llm", model=LLM_MODEL,
@@ -417,7 +417,7 @@ History:
 User:
 {query}
 """
-        return (await call_llm(prompt, temperature=0.4, num_predict=2048)).strip()
+        return (await call_llm(prompt, temperature=0.4, num_predict=4096)).strip()
 
     async def normalize_notification_query(self, query: str) -> str:
         """Chuẩn hóa câu THONG_BAO nhưng bảo vệ mọi số và định danh exact."""
@@ -447,7 +447,7 @@ Câu hỏi gốc:
             data = await call_model_json(
                 LLM_MODEL,
                 prompt,
-                num_predict=2048,
+                num_predict=4096,
             )
         except Exception as exc:
             logger.warning("[notification_normalizer] lỗi LLM, dùng câu gốc: %s", exc)
@@ -483,4 +483,4 @@ Câu hỏi:
 
 Trả lời ngắn gọn và trực tiếp.
 """
-        return (await call_llm(prompt, temperature=0.2, num_predict=2048)).strip()
+        return (await call_llm(prompt, temperature=0.2, num_predict=4096)).strip()
