@@ -8,7 +8,7 @@ from app.services.ctdt.subgraph_retriever import GraphBuildResult, SubgraphRetri
 
 
 @pytest.mark.asyncio
-async def test_original_query_and_llm_rewrite_are_not_rule_normalized():
+async def test_light_normalization_preserves_original_context_flow_and_user_query():
     service = pipeline.CTDTPipeline()
     question = "Các HP của ngành KHMT?"
     analysis = {"rewrite": "HP của KHMT", "entities": [], "vector_targets": []}
@@ -19,9 +19,10 @@ async def test_original_query_and_llm_rewrite_are_not_rule_normalized():
         service, "_generate_answer", new_callable=AsyncMock, return_value="Đáp án"
     ) as generate:
         result = await service.handle_query("  " + question + "  ", [{"role": "user", "content": "KHMT"}])
-    analyze.assert_awaited_once_with(question, "user: KHMT")
-    assert retrieve.call_args.args[0]["query"] == question
-    assert retrieve.call_args.args[0]["rewrite"] == "HP của KHMT"
+    analyze.assert_awaited_once_with("Các HP của ngành Khoa học máy tính?", "user: KHMT")
+    assert retrieve.call_args.args[0]["query"] == "Các HP của ngành Khoa học máy tính?"
+    assert retrieve.call_args.args[0]["rewrite"] == "HP của Khoa học máy tính"
+    assert generate.call_args.kwargs["original_query"] == question
     vector.assert_not_awaited()
     expected = "[GRAPH RESULT]\nDữ liệu graph\n\n[VECTOR RESULT]\nKhông có kết quả vector."
     assert result.context == expected

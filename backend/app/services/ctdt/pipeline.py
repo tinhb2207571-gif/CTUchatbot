@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 from app.services.common.llm_service import call_llm
 from app.services.common.pipeline_logger import elapsed_ms, log_context, log_event, now
 from app.services.ctdt.query_analyzer import analyze_ctdt_query, history_text, normalize_history
+from app.services.ctdt.query_normalizer import entity_name_variants, normalize_ctdt_query
 from app.services.ctdt.subgraph_retriever import GraphBuildResult, SubgraphRetriever
 from app.services.ctdt.vector_retriever import ALLOWED_VECTOR_TARGETS, search_vector_target
 
@@ -124,9 +125,23 @@ Hãy trả lời ngắn gọn, chính xác, và chỉ dùng thông tin trong con
         cleaned_history = normalize_history(history)
         history_string = history_text(cleaned_history)
 
+        normalization_started = now()
+        normalized_query = normalize_ctdt_query(query)
+        log_event(
+            "CTDT", "normalization", original_query=query,
+            normalized_query=normalized_query, elapsed_ms=elapsed_ms(normalization_started),
+        )
         analysis_started = now()
-        analysis = await analyze_ctdt_query(query, history_string)
-        rewritten_query = analysis.get("rewrite", query)
+        analysis = dict(await analyze_ctdt_query(normalized_query, history_string))
+        rewritten_query = normalize_ctdt_query(analysis.get("rewrite", normalized_query))
+        analysis["rewrite"] = rewritten_query
+        entities = []
+        for entity in analysis.get("entities", []):
+            for value in entity_name_variants(entity.get("value", "")) or [""]:
+                variant = {**entity, "value": value}
+                if variant not in entities:
+                    entities.append(variant)
+        analysis["entities"] = entities
         vector_targets = analysis.get("vector_targets", []) or ["HocPhan", "DieuKienTotNghiep"]
         log_event(
             "CTDT",
@@ -138,7 +153,7 @@ Hãy trả lời ngắn gọn, chính xác, và chỉ dùng thông tin trong con
         )
 
         retrieval_analysis = dict(analysis)
-        retrieval_analysis["query"] = query
+        retrieval_analysis["query"] = normalized_query
         graph_started = now()
         graph_result = await asyncio.to_thread(self.subgraph_retriever.retrieve, retrieval_analysis)
         log_event(

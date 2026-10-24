@@ -512,10 +512,15 @@ class SubgraphRetriever:
         return "(không rõ)"
 
     def _pick_props(self, props: Dict[str, Any], labels: List[str] | None = None) -> str:
+        keys = None
         if "ChuongTrinhDaoTao" in (labels or []):
+            keys = ("khoa", "he", "tong_tin_chi", "thoi_gian_dao_tao")
+        elif "HocPhan" in (labels or []):
+            keys = ("ma_hoc_phan", "ten_hoc_phan", "so_tin_chi", "yeu_cau_stc_toi_thieu")
+        if keys:
             return ", ".join(
                 f"{key}={props[key]}"
-                for key in ("khoa", "he", "tong_tin_chi", "thoi_gian_dao_tao")
+                for key in keys
                 if props.get(key) is not None and str(props[key]).strip()
             )
 

@@ -38,7 +38,7 @@ class CTDTContextTests(unittest.TestCase):
         }, ["ChuongTrinhDaoTao"])
         self.assertEqual(summary, "khoa=51, he=Đại trà, tong_tin_chi=161")
 
-    def test_course_context_matches_original_summary(self):
+    def test_course_context_adds_minimum_credits_as_fourth_property(self):
         context = SubgraphRetriever().serialize_subgraph({1: {
             "labels": ["HocPhan", "Entity"], "props": {
                 "ma_hoc_phan": "CT101", "ten_hoc_phan": "Lập trình",
@@ -47,7 +47,13 @@ class CTDTContextTests(unittest.TestCase):
             },
         }}, {})
         self.assertEqual(context, "[GRAPH RESULT]\nCác nút liên quan:\n"
-                         "- HocPhan: Lập trình (ma_hoc_phan=CT101, ten_hoc_phan=Lập trình, so_tin_chi=3)")
+                         "- HocPhan: Lập trình (ma_hoc_phan=CT101, ten_hoc_phan=Lập trình, so_tin_chi=3, yeu_cau_stc_toi_thieu=30)")
+
+    def test_course_without_minimum_credits_still_has_original_three_properties(self):
+        props = {"ma_hoc_phan": "CT201E", "ten_hoc_phan": "Niên luận cơ sở ngành Khoa học máy tính",
+                 "so_tin_chi": 3, "yeu_cau_stc_toi_thieu": None, "embedding": [0.1]}
+        summary = SubgraphRetriever()._pick_props(props, ["Entity", "HocPhan"])
+        self.assertEqual(summary, "ma_hoc_phan=CT201E, ten_hoc_phan=Niên luận cơ sở ngành Khoa học máy tính, so_tin_chi=3")
 
     def test_zero_and_false_values_are_not_dropped_from_original_fallback(self):
         summary = SubgraphRetriever()._pick_props({"so_tiet_ly_thuyet": 0, "bat_buoc": False})
