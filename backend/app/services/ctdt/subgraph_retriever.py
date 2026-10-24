@@ -94,7 +94,7 @@ class SubgraphRetriever:
         path_limit: int = 60,
         max_nodes: int = 70,
         max_relationships: int = 140,
-        max_text_chars: int = 12000,
+        max_text_chars: int = 20000,
     ) -> None:
         self.seed_limit = max(1, min(seed_limit, 8))
         self.max_depth = max(1, min(max_depth, 2))
