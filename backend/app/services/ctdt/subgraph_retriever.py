@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any, Dict, List, Tuple
 
 from app.db.neo4j import get_driver
+from app.services.ctdt.schema import CTDT_NODE_PROPERTIES
 
 DEFAULT_KHOA = 51
 DEFAULT_HE = "đại trà"
@@ -11,6 +13,14 @@ DEFAULT_HE = "đại trà"
 _NAME_KEYS = (
     "ten_hoc_phan",
     "ten_nganh_vi",
+    "ten_khoa",
+    "ten_bo_mon",
+    "ten_trinh_do",
+    "loai_van_bang",
+    "ten_hinh_thuc",
+    "ten_phuong_thuc",
+    "ten_nhom",
+    "noi_dung_yeu_cau",
     "ten_khoi",
     "ten",
     "noi_dung",
@@ -300,7 +310,7 @@ class SubgraphRetriever:
             "seed_limit": self.seed_limit,
         }
         driver = get_driver()
-        with driver.session() as session:
+        with driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             return session.run(cypher, **params).data()
 
     def _prioritize_seed_ids(self, seed_rows: List[Dict[str, Any]], anchor_node_types: List[str]) -> List[int]:
@@ -383,7 +393,7 @@ class SubgraphRetriever:
         LIMIT $path_limit
         """
         driver = get_driver()
-        with driver.session() as session:
+        with driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             return session.run(
                 cypher,
                 seed_ids=seed_ids,
@@ -441,7 +451,7 @@ class SubgraphRetriever:
             WHERE id(n) IN $seed_ids
             RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props
             """
-            with driver.session() as session:
+            with driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
                 fill_rows = session.run(fill_cypher, seed_ids=missing).data()
             for row in fill_rows:
                 node_id = int(row["id"])
@@ -473,9 +483,10 @@ class SubgraphRetriever:
 
         node_lines: List[str] = []
         for node in nodes_by_id.values():
-            label = node["labels"][0] if node.get("labels") else "Node"
+            labels = node.get("labels") or []
+            label = next((item for item in labels if item in CTDT_NODE_PROPERTIES), labels[0] if labels else "Node")
             name = self._pick_name(node.get("props", {}))
-            summary_props = self._pick_props(node.get("props", {}))
+            summary_props = self._pick_props(node.get("props", {}), label)
             if summary_props:
                 node_lines.append(f"- {label}: {name} ({summary_props})")
             else:
@@ -510,7 +521,16 @@ class SubgraphRetriever:
                 return str(value).strip()
         return "(không rõ)"
 
-    def _pick_props(self, props: Dict[str, Any]) -> str:
+    def _pick_props(self, props: Dict[str, Any], label: str = "") -> str:
+        if label in CTDT_NODE_PROPERTIES:
+            parts = [
+                f"{key}={props[key]}"
+                for key in CTDT_NODE_PROPERTIES[label]
+                if props.get(key) is not None and str(props[key]).strip()
+            ]
+            if parts:
+                return ", ".join(parts)
+
         parts: List[str] = []
         seen = set()
         for key in _PROP_KEYS:

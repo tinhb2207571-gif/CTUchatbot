@@ -1,3 +1,35 @@
+# Tên index dùng chung cho bộ nhập và bộ truy xuất CTĐT.
+CTDT_VECTOR_INDEXES = {
+    "HocPhan": "vector_hocphan_embedding",
+    "DieuKienTotNghiep": "vector_dieukientotnghiep_embedding",
+    "ChuanDauRa": "vector_chuandaura_embedding",
+    "VanBanPhapLy": "vector_vanbanphaply_embedding",
+}
+
+# Thuộc tính gửi cho LLM theo từng label; không đưa embedding vào ngữ cảnh.
+CTDT_NODE_PROPERTIES = {
+    "ChuongTrinhDaoTao": ("ma_chuong_trinh", "khoa", "he", "tong_tin_chi", "thoi_gian_dao_tao", "ngon_ngu", "thang_diem"),
+    "HocPhan": ("ma_hoc_phan", "ten_hoc_phan", "so_tin_chi", "so_tiet_ly_thuyet", "so_tiet_thuc_hanh", "tom_tat", "dieu_kien", "yeu_cau_stc_toi_thieu", "bat_buoc"),
+    "Nganh": ("ma_nganh", "ten_nganh_vi", "ten_nganh_en"),
+    "Khoa": ("ma_khoa", "ten_khoa"),
+    "BoMon": ("ma_bo_mon", "ten_bo_mon"),
+    "KhoiKienThuc": ("ma_khoi", "ten_khoi", "tong_tin_chi", "tin_chi_bat_buoc", "tin_chi_tu_chon"),
+    "ChuanDauRa": ("ma_chuan", "noi_dung", "nhom", "loai"),
+    "VanBanPhapLy": ("so", "ten", "loai", "ngay_ban_hanh", "co_quan_ban_hanh", "noi_dung_goc"),
+    "TrinhDo": ("ma_trinh_do", "ten_trinh_do"),
+    "LoaiVanBang": ("ma_loai", "loai_van_bang"),
+    "HinhThucDaoTao": ("ma_hinh_thuc", "ten_hinh_thuc"),
+    "PhuongThucDaoTao": ("ma_phuong_thuc", "ten_phuong_thuc"),
+    "MucTieuDaoTao": ("loai", "noi_dung"),
+    "ChuanThamKhao": ("noi_dung", "link", "noi_dung_goc"),
+    "NhomHocPhanTuChon": ("ten_nhom",),
+    "YeuCauTuChon": ("noi_dung_yeu_cau", "so_tin_chi_yeu_cau"),
+    **{label: ("noi_dung",) for label in (
+        "DoiTuongTuyenSinh", "DieuKienTotNghiep", "ViTriViecLam",
+        "DanhGiaKiemDinh", "KhaNangHocTap",
+    )},
+}
+
 GRAPH_SCHEMA = (
     "Nodes:\n"
     "- ChuongTrinhDaoTao(ma_chuong_trinh, khoa, he, ngon_ngu, tong_tin_chi, thoi_gian_dao_tao, thang_diem): Thực thể trung tâm quản lý chương trình đào tạo.\n"
@@ -42,9 +74,10 @@ GRAPH_SCHEMA = (
     "- (:ChuongTrinhDaoTao)-[:GOM]->(:KhoiKienThuc)\n"
     "- (:ChuongTrinhDaoTao)-[:GOM]->(:HocPhan)\n"
     "- (:KhoiKienThuc)-[:GOM]->(:HocPhan)\n"
+    "- (:KhoiKienThuc)-[:GOM]->(:YeuCauTuChon)\n"
     "- (:YeuCauTuChon)-[:DOI_VOI]->(:NhomHocPhanTuChon)\n"
     "- (:YeuCauTuChon)-[:GOM]->(:HocPhan)\n"
     "- (:NhomHocPhanTuChon)-[:GOM]->(:HocPhan)\n"
     "- (:HocPhan)-[:YEU_CAU_TIEN_QUYET]->(:HocPhan)\n"
     "- (:HocPhan)-[:CO_THE_SONG_HANH]->(:HocPhan)\n"
-) 
+)

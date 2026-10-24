@@ -335,12 +335,13 @@ class CurriculumETL:
                         id_=current_block_id,
                         metadata={
                             "type": "KhoiKienThuc",
+                            "ma_khoi": current_block_id,
                             "ten_khoi": ten_khoi,
                             "tong_tin_chi": 0, "tin_chi_bat_buoc": 0, "tin_chi_tu_chon": 0
                         }
                     )
                     self.nodes.append(block_node)
-                    self._create_relationship(self.program_id, current_block_id, "CO_KHOI_KIEN_THUC")
+                    self._create_relationship(self.program_id, current_block_id, "GOM")
                 continue
 
             # --- 2. XỬ LÝ DÒNG TỔNG KẾT (CỘNG) ---
@@ -387,12 +388,13 @@ class CurriculumETL:
                         metadata={
                             "type": "YeuCauTuChon",
                             "noi_dung_yeu_cau": req_text,
-                            "mo_ta": f"Yêu cầu tự chọn trong khối {current_block_id}"
+                            **({"so_tin_chi_yeu_cau": int(match.group())}
+                               if (match := re.search(r"\d+", req_text)) else {}),
                         }
                     )
                     self.nodes.append(p_node)
                     created_virtual_nodes.add(current_parent_group_id)
-                    self._create_relationship(current_block_id, current_parent_group_id, "CO_YEU_CAU_TU_CHON")
+                    self._create_relationship(current_block_id, current_parent_group_id, "GOM")
             
             # B. Nhận diện Node Con (Nhánh thành phần - VD: "AV" hoặc "PV")
             if col_bat_buoc and not col_bat_buoc.isdigit() and current_parent_group_id:
@@ -410,7 +412,7 @@ class CurriculumETL:
                     )
                     self.nodes.append(s_node)
                     created_virtual_nodes.add(current_sub_group_id)
-                    self._create_relationship(current_parent_group_id, current_sub_group_id, "CO_NHOM_THANH_PHAN")
+                    self._create_relationship(current_parent_group_id, current_sub_group_id, "DOI_VOI")
 
             # --- 4. TẠO NODE HỌC PHẦN VÀ LIÊN KẾT THEO PHÂN CẤP ---
             ma_hps = pat_course_code.findall(col_ma_hp)
@@ -432,8 +434,8 @@ class CurriculumETL:
                     id_=hp_id,
                     metadata={
                         "type": "HocPhan",
-                        "ma_hp": hp_code,
-                        "ten_hp": clean_ten_hp,
+                        "ma_hoc_phan": hp_code,
+                        CourseProps.TEN: clean_ten_hp,
                         "so_tin_chi": col_tc,
                         "so_tiet_ly_thuyet": col_so_tiet_lt if col_so_tiet_lt else 0,
                         "so_tiet_thuc_hanh": col_so_tiet_th if col_so_tiet_th else 0,
@@ -441,15 +443,19 @@ class CurriculumETL:
                     }
                 )
                 self.nodes.append(course_node)
+
+                # KB liên kết trực tiếp chương trình và khối tới học phần,
+                # kể cả khi học phần đồng thời nằm trong nhóm tự chọn.
+                self._create_relationship(self.program_id, hp_id, "GOM")
+                if current_block_id:
+                    self._create_relationship(current_block_id, hp_id, "GOM")
                 
                 if current_block_id:
                     # Ưu tiên liên kết vào nhóm con thấp nhất hiện có
                     if current_sub_group_id:
-                        self._create_relationship(current_sub_group_id, hp_id, "GOM_HOC_PHAN")
+                        self._create_relationship(current_sub_group_id, hp_id, "GOM")
                     elif current_parent_group_id:
-                        self._create_relationship(current_parent_group_id, hp_id, "GOM_HOC_PHAN")
-                    else:
-                        self._create_relationship(current_block_id, hp_id, "GOM_HOC_PHAN")
+                        self._create_relationship(current_parent_group_id, hp_id, "GOM")
 
                 # Thiết lập Quan hệ Tiên quyết/Song hành
                 for pr in pat_course_code.findall(col_tien_quyet):
@@ -553,7 +559,7 @@ class CurriculumETL:
         self._create_relationship(
             source_id=self.program_id,
             target_id=vbpl_id,
-            rel_type="DUOC_BAN_HANH_THEO"
+            rel_type="BAN_HANH_THEO"
         )
 
         # Node Trình độ
@@ -568,6 +574,7 @@ class CurriculumETL:
             id_=id_trinh_do,
             metadata={
                 "type": "TrinhDo",
+                "ma_trinh_do": id_trinh_do,
                 LevelProps.TEN: trinh_do,
             }
         )
@@ -577,7 +584,7 @@ class CurriculumETL:
         self._create_relationship(
             source_id=self.program_id,
             target_id=id_trinh_do,
-            rel_type="DAO_TAO_TRINH_DO"
+            rel_type="DAO_TAO"
         )
         
     def _parse_major(self, content):
@@ -606,6 +613,7 @@ class CurriculumETL:
             id_=ma_nganh,
             metadata={
                 "type": "Nganh",
+                "ma_nganh": ma_nganh,
                 MajorProps.TEN_VI: ten_nganh_vi,
                 MajorProps.TEN_EN: ten_nganh_en,
             }
@@ -627,6 +635,7 @@ class CurriculumETL:
                 id_=ma_don_vi,
                 metadata={
                     "type": "BoMon",
+                    "ma_bo_mon": ma_don_vi,
                     DepartmentProps.TEN: subunit
                 }
             )
@@ -640,6 +649,7 @@ class CurriculumETL:
                 id_=ma_don_vi,
                 metadata={
                     "type": "Khoa",
+                    "ma_khoa": ma_don_vi,
                     FacultyProps.TEN: subunit
                 }
             )
@@ -740,6 +750,7 @@ class CurriculumETL:
             id_=degree_id,
             metadata={
                 "type": "LoaiVanBang",
+                "ma_loai": degree_id,
                 DegreeProps.TEN: loai_van_bang,
             }
         )
@@ -749,7 +760,7 @@ class CurriculumETL:
         self._create_relationship(
             source_id=self.program_id,
             target_id=degree_id,
-            rel_type="CO_LOAI_VAN_BANG"
+            rel_type="CAP"
         )
 
         # Node Hình thức đào tạo
@@ -766,6 +777,7 @@ class CurriculumETL:
                     id_=form_id,
                     metadata={
                         "type": "HinhThucDaoTao",
+                        "ma_hinh_thuc": form_id,
                         TrainingFormProps.TEN: form,
                     }
                 )
@@ -774,7 +786,7 @@ class CurriculumETL:
                 self._create_relationship(
                     source_id=self.program_id,
                     target_id=form_id,
-                    rel_type="DAO_TAO_THEO_HINH_THUC"
+                    rel_type="CO"
                 )
 
         # Phương thức tổ chức đào tạo
@@ -795,6 +807,7 @@ class CurriculumETL:
                     id_=method_id,
                     metadata={
                         "type": "PhuongThucDaoTao",
+                        "ma_phuong_thuc": method_id,
                         TrainingMethodProps.TEN: method,
                     }
                 )
@@ -803,7 +816,7 @@ class CurriculumETL:
                 self._create_relationship(
                     source_id=self.program_id,
                     target_id=method_id,
-                    rel_type="DAO_TAO_THEO_PHUONG_THUC"
+                    rel_type="CO"
                 )
 
                 self._create_relationship(
@@ -845,7 +858,7 @@ class CurriculumETL:
             self._create_relationship(
                 source_id=self.program_id,
                 target_id=id,
-                rel_type="CO_MUC_TIEU_DAO_TAO"
+                rel_type="CO"
             )
         else:
             # Duyệt qua từng phần đã tách
@@ -872,7 +885,7 @@ class CurriculumETL:
                     self._create_relationship(
                         source_id=self.program_id,
                         target_id=id,
-                        rel_type="CO_MUC_TIEU_DAO_TAO"
+                        rel_type="CO"
                     )
                         
                 else:
@@ -904,7 +917,7 @@ class CurriculumETL:
                         self._create_relationship(
                             source_id=self.program_id,
                             target_id=id,
-                            rel_type="CO_MUC_TIEU_DAO_TAO"
+                            rel_type="CO"
                         )
 
     def _parse_job_positions(self, text):
@@ -931,7 +944,7 @@ class CurriculumETL:
             self._create_relationship(
                 source_id=self.program_id,
                 target_id=job_id,
-                rel_type="CO_CO_HOI_VIEC_LAM"
+                rel_type="CO"
             )
 
     def _parse_references(self, text):
@@ -1050,7 +1063,7 @@ class CurriculumETL:
                 self._create_relationship(
                     source_id=self.program_id,
                     target_id=ref_id,
-                    rel_type="THAM_CHIEU"
+                    rel_type="THAM_KHAO"
                 )
 
     def _parse_study_opportunities(self, text):
@@ -1076,7 +1089,7 @@ class CurriculumETL:
             self._create_relationship(
                 source_id=self.program_id,
                 target_id=opp_id,
-                rel_type="TAO_NEN_TANG"
+                rel_type="DAT_DUOC"
             )
 
     def _process_learning_outcomes(self, content):
@@ -1168,7 +1181,7 @@ class CurriculumETL:
                 self._create_relationship(
                     source_id=self.program_id,
                     target_id=self._normalize_id(unique_id),
-                    rel_type="DAT_CHUAN_DAU_RA"
+                    rel_type="CO"
                 )
             else:
                 pass

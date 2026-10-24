@@ -11,6 +11,7 @@ from app.api.deps import require_admin
 from app.scripts.XuLyChuongTrinhDaoTao import CurriculumETL
 from app.scripts.neo4j_class import Neo4jConnector
 from app.scripts.run import process_quy_che_hoc_vu
+from app.services.ctdt.schema import CTDT_VECTOR_INDEXES
 
 router = APIRouter()
 
@@ -77,7 +78,8 @@ class ChuyenNganhDaoTaoProcessor(BaseCategoryProcessor):
             await db.create_constraints(LABELS_TO_INDEX)
             await db.add_nodes(etl.nodes)
             await db.add_edges(etl.edges)
-            await db.create_vector_index()
+            for label, index_name in CTDT_VECTOR_INDEXES.items():
+                await db.create_vector_index(index_name=index_name, label=label)
         finally:
             if db:
                 await db.close()

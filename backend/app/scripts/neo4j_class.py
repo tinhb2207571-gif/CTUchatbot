@@ -24,7 +24,7 @@ class Neo4jConnector:
             logger.info("Đã đóng kết nối Neo4j.")
 
     async def create_constraints(self, labels):
-        async with self.driver.session() as session: # Dùng async with
+        async with self.driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session: # Dùng async with
             for label in labels:
                 query = f"CREATE CONSTRAINT unique_{label.lower()}_id IF NOT EXISTS FOR (n:{label}) REQUIRE n.id IS UNIQUE"
                 await session.run(query)
@@ -37,7 +37,7 @@ class Neo4jConnector:
         SET n += $props
         """
         
-        async with self.driver.session() as session:
+        async with self.driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             count = 0
             for node in nodes_data:
                 if hasattr(node, "metadata"): 
@@ -81,7 +81,7 @@ class Neo4jConnector:
         SET r += $props
         """
 
-        async with self.driver.session() as session:
+        async with self.driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             count = 0
             for edge in edges_data:
                 rel_type = edge.get("type", "RELATED_TO")
@@ -104,7 +104,7 @@ class Neo4jConnector:
 
     async def clear_database(self):
         """Hàm nguy hiểm: Xóa sạch dữ liệu (Dùng để test lại từ đầu)"""
-        async with self.driver.session() as session:
+        async with self.driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             await session.run("MATCH (n) DETACH DELETE n")
             logger.warning("Đã xóa sạch database!")
 
@@ -121,12 +121,13 @@ class Neo4jConnector:
          `vector.similarity_function`: '{similarity}'
         }}}}
         """
-        async with self.driver.session() as session:
+        async with self.driver.session(database=os.getenv("NEO4J_DATABASE") or None) as session:
             try:
                 await session.run(query)
                 logger.info(f"Đã khởi tạo Vector Index: {index_name} trên Label: {label}")
             except Exception as e:
                 logger.error(f"Lỗi khi tạo Vector Index: {e}")
+                raise
 
 # Cấu hình kết nối
 # URI = "bolt://localhost:7687"

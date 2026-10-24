@@ -25,7 +25,7 @@ class FacultyProps(str, Enum):
 
 class DepartmentProps(str, Enum):
     """Thuộc tính cho Node Bộ môn (BoMon)"""
-    TEN = "ten_bomon"   
+    TEN = "ten_bo_mon"
              
 class MajorProps(str, Enum):
     """Thuộc tính cho Node Ngành (Nganh)"""
@@ -36,7 +36,7 @@ class ProgramProps(str, Enum):
     """Thuộc tính cho Node Chương trình đào tạo (ChuongTrinhDaoTao)"""
     MA_CHUONG_TRINH = "ma_chuong_trinh"                       # Mã chương trình (VD: 7480202_STD", "7480202_CLC")
     KHOA_HOC = "khoa"               # Khóa (VD: 48)
-    LOAI_HINH = "loai_hinh"         # Chất lượng cao / Đại trà
+    LOAI_HINH = "he"                # Chất lượng cao / Đại trà (tên thuộc tính trong KB)
     NGON_NGU = "ngon_ngu"           # Tiếng Việt / Anh
     TONG_TIN_CHI = "tong_tin_chi"   # 161
     THOI_GIAN = "thoi_gian_dao_tao" # 4.5
@@ -64,7 +64,7 @@ class TrainingMethodProps(str, Enum):
 class CourseProps(str, Enum):
     """Thuộc tính cho Node Học phần (HocPhan)"""
     ID = "id"
-    TEN = "ten" 
+    TEN = "ten_hoc_phan"
     SO_TIN_CHI = "so_tin_chi"
     SO_TIET_LY_THUYET = "so_tiet_ly_thuyet"
     SO_TIET_THUC_HANH = "so_tiet_thuc_hanh"

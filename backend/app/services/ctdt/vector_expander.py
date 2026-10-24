@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import os
 from typing import Any, Dict, List
 
 from app.db.neo4j import get_driver
@@ -49,7 +50,7 @@ def _expand_one_course(origin_id: str, relations: List[str]) -> List[Dict[str, A
            target.so_tin_chi AS so_tin_chi
     ORDER BY type(r), target.id
     """
-    with get_driver().session() as session:
+    with get_driver().session(database=os.getenv("NEO4J_DATABASE") or None) as session:
         return session.run(cypher, origin_id=origin_id).data()
 
 

@@ -5,20 +5,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from typing import Any, Dict, List
 
 from app.db.neo4j import get_driver
 from app.services.common.embedding import get_embedding_model
+from app.services.ctdt.schema import CTDT_VECTOR_INDEXES
 
 logger = logging.getLogger("app.ctdt.vector")
 
 ALLOWED_VECTOR_TARGETS = {"HocPhan", "DieuKienTotNghiep", "ChuanDauRa", "VanBanPhapLy"}
-_VECTOR_INDEX_CANDIDATES = {
-    "HocPhan": ["vector_hocphan_embedding"],
-    "DieuKienTotNghiep": ["vector_dieukientotnghiep_embedding"],
-    "ChuanDauRa": ["vector_chuandaura_embedding"],
-    "VanBanPhapLy": ["vector_vanbanphaply_embedding"],
-}
+_VECTOR_INDEX_CANDIDATES = {label: [name] for label, name in CTDT_VECTOR_INDEXES.items()}
 
 
 def _stringify(value: Any) -> str:
@@ -52,7 +49,7 @@ def _execute_vector_query(index_name: str, embedding: List[float], top_k: int = 
         "ORDER BY score DESC "
         "LIMIT $top_k"
     )
-    with get_driver().session() as session:
+    with get_driver().session(database=os.getenv("NEO4J_DATABASE") or None) as session:
         return session.run(cypher, embedding=embedding, top_k=top_k).data()
 
 
